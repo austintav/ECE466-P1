@@ -15,7 +15,7 @@
 
 [\t \n]+        ;
 vars            { return VARS; }
-\$[a-z0-a-z0-9]+	{ yylval.tmp = strdup(yytext); return TMP; } 
+$[a-z0-9][a-z0-9]?	{ yylval.tmp = strdup(yytext); return TMP; } 
 [a-zA-z_]+          { yylval.id = strdup(yytext); return ID; } 
 [0-9]+          { yylval.num = atoi(yytext); return NUM; }
 "="	 { return ASSIGN;   } 

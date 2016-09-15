@@ -82,8 +82,8 @@ program: decl stmtlist
   /* 
     IMPLEMENT: return value
   */
-	//LLVMBuildRet(Builder,tmpvar);
-	LLVMBuildRet(Builder,LLVMConstInt(LLVMInt64Type(),0,0));
+	LLVMBuildRet(Builder,get_val("tmpVar"));
+	//LLVMBuildRet(Builder,LLVMConstInt(LLVMInt64Type(),0,0));
 	//return 0;  
 }
   ;
@@ -211,16 +211,12 @@ expr:   expr MINUS expr
 */
 	$$ = LLVMBuildMul(Builder,$1,$3,"raise");
 }
-      | expr QUESTION expr
+      | expr QUESTION expr COLON expr
 {
   /* IMPLEMENT: QUESTION */
-	compare = LLVMBuildICmp(Builder,'=',$1,LLVMConstInt(LLVMInt64Type(),1,0),"quest");
+	//compare = LLVMBuildICmp(Builder,'=',$1,LLVMConstInt(LLVMInt64Type(),1,0),"quest");
+	$$ = LLVMBuildSelect(Builder,LLVMConstInt(LLVMInt64Type(),1,0),$1,$3,"select");
 }      
-	  | expr COLON expr
-{
-  /* IMPLEMENT: colon */
-	$$ = LLVMBuildSelect(Builder,LLVMConstInt(LLVMInt64Type(),compare,0),$1,$3,"select");
-}
       | NUM
 { 
   /* IMPLEMENT: constant */
