@@ -4,6 +4,7 @@
 #include "llvm-c/BitReader.h"
 #include "llvm-c/BitWriter.h"
 #include <string.h>
+#include <stdlib.h>
 
 #include "uthash.h"
 
@@ -82,8 +83,8 @@ program: decl stmtlist
   /* 
     IMPLEMENT: return value
   */
-	LLVMBuildRet(Builder,get_val("tmpVar"));
-	//LLVMBuildRet(Builder,LLVMConstInt(LLVMInt64Type(),0,0));
+	//LLVMBuildRet(Builder,get_val("tmpVar"));
+	LLVMBuildRet(Builder,LLVMConstInt(LLVMInt64Type(),0,0));
 	//return 0;  
 }
   ;
@@ -153,10 +154,11 @@ stmt: TMP ASSIGN expr SEMI
 {
   /* IMPLEMENT: remember temporary and associated expression $3 */
   $$ = $3;
+
 	LLVMValueRef addr = get_val($1);
 	if (addr==NULL)
 	{
-		add_tmp("tmpVar", $$);
+		add_tmp($1, $$);
 	}
 }
 ;
@@ -214,7 +216,7 @@ expr:   expr MINUS expr
       | expr QUESTION expr COLON expr
 {
   /* IMPLEMENT: QUESTION */
-	//compare = LLVMBuildICmp(Builder,'=',$1,LLVMConstInt(LLVMInt64Type(),1,0),"quest");
+	compare = LLVMBuildICmp(Builder,'=',$1,LLVMConstInt(LLVMInt64Type(),1,0),"quest");
 	$$ = LLVMBuildSelect(Builder,LLVMConstInt(LLVMInt64Type(),1,0),$1,$3,"select");
 }      
       | NUM
