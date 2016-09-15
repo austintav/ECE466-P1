@@ -1,15 +1,24 @@
+/*
+Austin Tavenner
+Daniel Black
+
+Description:This is the implementation for project 1, a "simple" IR creator
+			We ran into some difficulties with segmentation faults and only trying to
+			use the provided hashmap. We resulted in using a linkedlist which allowed
+			for the management of the order of variables to become much easier.
+Source for linkedlist: http://www.tutorialspoint.com/data_structures_algorithms/linked_list_program_in_c.htm
+*/
+
 %{
 #include <stdio.h>
 #include "llvm-c/Core.h"
 #include "llvm-c/BitReader.h"
 #include "llvm-c/BitWriter.h"
 #include <string.h>
-#include <stdlib.h>
 
 #include "uthash.h"
 
 #include <errno.h>
-  //#include <search.h>
 
 extern FILE *yyin;
 int yylex(void);
@@ -25,6 +34,61 @@ LLVMBasicBlockRef BasicBlock;
 LLVMBuilderRef Builder;
 
 int params_cnt=0;
+LLVMValueRef final_exp;
+
+//definition of struct for linkedlist
+struct node  
+{
+   int key;
+   char *id;
+   struct node *next;
+};
+
+struct node *head = NULL;
+
+//insert to the front of the linkedlist
+void insertFirst(char *id, int key)
+{
+   //create a link
+   struct node *link = (struct node*) malloc(sizeof(struct node));
+	
+   	link->key = key;
+	link->id = id;
+	
+   //point it to old first node
+   link->next = head;
+	
+   //point first to new first node
+   head = link;
+}
+
+struct node* find(char *id){
+
+   //start from the first link
+   struct node* current = head;
+
+   //if list is empty
+   if(head == NULL)
+	{
+      return NULL;
+   }
+
+   //navigate through list
+   while(strcmp(current->id, id) != 0){
+	
+      //if it is last node
+      if(current->next == NULL){
+         return NULL;
+      }else {
+         //go to next link
+         current = current->next;
+      }
+   }	
+   //if data found, return the current Link
+   return current;
+}
+
+
 
 struct TmpMap{
   char *key;                  /* key */
@@ -52,7 +116,6 @@ LLVMValueRef get_val(char *tmp) {
     return NULL; // returns NULL if not found
 }
 
-
 %}
 
 %union {
@@ -76,14 +139,16 @@ LLVMValueRef get_val(char *tmp) {
 %start program
 
 %%
+
 program: decl stmtlist 
 { 
   /* 
-    IMPLEMENT: return value
+    IMPLEMENT: return value of final expression
+	a = 2 + 1
+	a = 3
+	<3>
   */
-	//LLVMBuildRet(Builder,get_val("tmpVar"));
-	LLVMBuildRet(Builder,LLVMConstInt(LLVMInt64Type(),0,0));
-	//return 0;  
+	 LLVMBuildRet(Builder,final_exp); 
 }
   ;
 
@@ -133,15 +198,16 @@ varlist:   varlist COMMA ID
   /* IMPLEMENT: remember ID and its position so that you can
      reference the parameter later
    */
-  
-  printf("%d \n",params_cnt);
-  params_cnt++;
-	//hello
+	//add var to linkedlist
+	insertFirst($3,params_cnt);
+  	params_cnt++;
 }
-	| ID
+| ID
 {
   /* IMPLEMENT: remember ID and its position for later reference*/
-  params_cnt++;
+	//add var to linkedlist
+	insertFirst($1,params_cnt);
+  	params_cnt++;
 }
 ;
 
@@ -152,25 +218,23 @@ stmtlist:  stmtlist stmt { $$ = $2; }
 stmt: TMP ASSIGN expr SEMI
 {
   /* IMPLEMENT: remember temporary and associated expression $3 */
-  $$ = $3;
-
-	LLVMValueRef addr = get_val($1);
-	if (addr==NULL)
-	{
-		add_tmp($1, $$);
-	}
+  	$$ = $3;
+	
+	//manage tmp variables with expr
+	add_tmp($1,$3);
+	final_exp = $3;
 }
 ;
 
 expr:   expr MINUS expr
 {
   /* IMPLEMENT: subtraction */
- //$$ = LLVMBuildSub(Builder,$1,$3,"sub");
+	$$ = LLVMBuildSub(Builder,$1,$3,"sub");
 } 
      | expr PLUS expr
 {
   /* IMPLEMENT: addition */
-  //$$ = LLVMBuildAdd(Builder,$1,$3,"add");
+	$$ = LLVMBuildAdd(Builder,$1,$3,"add");
 }
       | MINUS expr 
 {
@@ -180,62 +244,75 @@ expr:   expr MINUS expr
       | expr MULTIPLY expr
 {
   /* IMPLEMENT: multiply */
-	//$$ = LLVMBuildMul(Builder,$1,$3,"mult");
+	$$ = LLVMBuildMul(Builder,$1,$3,"mult");
 }
       | expr DIVIDE expr
 {
   /* IMPLEMENT: divide */
-	//$$ = LLVMBuildSDiv(Builder,$1,$3,"div");
 	if($3 == 0){
-		yyerror("DIV BY ZERO\n");
+		yyerror("DIVIDE BY ZERO\n");
+		abort();
 	}
-
-  printf("DIVIDE\n");
+	$$ = LLVMBuildSDiv(Builder,$1,$3,"div");
 }
       | expr LESSTHAN expr
 {
-  /* IMPLEMENT: less than */
+	/* IMPLEMENT: less than */
 	LLVMValueRef less = LLVMBuildICmp(Builder,LLVMIntSLT,$1,$3,"compare");
 	$$ = LLVMBuildZExt(Builder,less,LLVMInt64Type(),"intcast");
 }
+
       | expr RAISE expr
 {
   /* IMPLEMENT: raise */
-/*
-	int a;
-	char str[15] = "0";
-	
-	for( a = 0; a < $3; a = a + 1){
-		int b = a + 1;
-		LLVMBuildMul(Builder,tempPro,$1,"multiply");
+
+	//convert value to int to be used in for loop
+	long long b = LLVMConstIntGetSExtValue($3);
+	if($1 == 0){
+		yyerror("BASE OF ZERO\n");
+		abort();
 	}
-*/
-	$$ = LLVMBuildMul(Builder,$1,$3,"raise");
+	//divide base by itself to achieve a ValueRef of 1
+	LLVMValueRef tempPro = LLVMBuildSDiv(Builder,$1,$1,"div");
+	
+	//for loop to calculate exponential term
+	for(long long a = 0; a < b; a = a + 1){
+		tempPro = LLVMBuildMul(Builder,tempPro,$1,"multiply");
+	}
+	$$ = tempPro;
 }
+
       | expr QUESTION expr COLON expr
 {
-  /* IMPLEMENT: QUESTION */
-	LLVMValueRef comp = LLVMBuildICmp(Builder,LLVMIntEQ,$1,LLVMConstInt(LLVMInt64Type(),1,0),"quest");
-	$$ = LLVMBuildSelect(Builder,comp,$1,$3,"select");
-}      
+  /* IMPLEMENT: QUESTION AND COLON*/
+	$$ = LLVMBuildSelect(Builder,$1,$3,$5,"select");
+} 
+
       | NUM
 { 
   /* IMPLEMENT: constant */
-  printf("$1:%d  \n", $1);
 	$$ = LLVMConstInt(LLVMInt64Type(),$1,0);
 }
       | ID
 {
-  /* IMPLEMENT: get reference to function parameter
-     Hint: LLVMGetParam(...)
-   */
-	$$  = LLVMGetParam(Function,params_cnt);
+  /* IMPLEMENT: get reference to function parameter */
+
+	struct node *temp = find($1);
+	if(temp == NULL){
+		yyerror("NULL\n");
+		abort();
+	}
+	$$  = LLVMGetParam(Function,temp->key);
 }
       | TMP
 {
   /* IMPLEMENT: get expression associated with TMP */
-	//$$ = get_val("tmpvar");
-	$$ = get_val($1);
+	LLVMValueRef n_val = get_val($1);
+	if (n_val == NULL) {
+		yyerror( "NULL\n" );
+		abort();
+	}
+	$$ = n_val;
 }
 ;
 
