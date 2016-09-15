@@ -25,7 +25,6 @@ LLVMBasicBlockRef BasicBlock;
 LLVMBuilderRef Builder;
 
 int params_cnt=0;
-int compare;
 
 struct TmpMap{
   char *key;                  /* key */
@@ -53,7 +52,6 @@ LLVMValueRef get_val(char *tmp) {
     return NULL; // returns NULL if not found
 }
 
-//add_tmp("tmpvar",0);
 
 %}
 
@@ -138,6 +136,7 @@ varlist:   varlist COMMA ID
   
   printf("%d \n",params_cnt);
   params_cnt++;
+	//hello
 }
 	| ID
 {
@@ -166,12 +165,12 @@ stmt: TMP ASSIGN expr SEMI
 expr:   expr MINUS expr
 {
   /* IMPLEMENT: subtraction */
- $$ = LLVMBuildSub(Builder,$1,$3,"sub");
+ //$$ = LLVMBuildSub(Builder,$1,$3,"sub");
 } 
      | expr PLUS expr
 {
   /* IMPLEMENT: addition */
-  $$ = LLVMBuildAdd(Builder,$1,$3,"add");
+  //$$ = LLVMBuildAdd(Builder,$1,$3,"add");
 }
       | MINUS expr 
 {
@@ -181,12 +180,12 @@ expr:   expr MINUS expr
       | expr MULTIPLY expr
 {
   /* IMPLEMENT: multiply */
-	$$ = LLVMBuildMul(Builder,$1,$3,"mult");
+	//$$ = LLVMBuildMul(Builder,$1,$3,"mult");
 }
       | expr DIVIDE expr
 {
   /* IMPLEMENT: divide */
-	$$ = LLVMBuildSDiv(Builder,$1,$3,"div");
+	//$$ = LLVMBuildSDiv(Builder,$1,$3,"div");
 	if($3 == 0){
 		yyerror("DIV BY ZERO\n");
 	}
@@ -196,8 +195,8 @@ expr:   expr MINUS expr
       | expr LESSTHAN expr
 {
   /* IMPLEMENT: less than */
-	//add_tmp("cond",LLVMBuildICmp(Builder,'<',$1,$3,"compare"));
-	$$ = LLVMBuildZExt(Builder,0,LLVMInt64Type(),"intcast");
+	LLVMValueRef less = LLVMBuildICmp(Builder,LLVMIntSLT,$1,$3,"compare");
+	$$ = LLVMBuildZExt(Builder,less,LLVMInt64Type(),"intcast");
 }
       | expr RAISE expr
 {
@@ -216,8 +215,8 @@ expr:   expr MINUS expr
       | expr QUESTION expr COLON expr
 {
   /* IMPLEMENT: QUESTION */
-	compare = LLVMBuildICmp(Builder,'=',$1,LLVMConstInt(LLVMInt64Type(),1,0),"quest");
-	$$ = LLVMBuildSelect(Builder,LLVMConstInt(LLVMInt64Type(),1,0),$1,$3,"select");
+	LLVMValueRef comp = LLVMBuildICmp(Builder,LLVMIntEQ,$1,LLVMConstInt(LLVMInt64Type(),1,0),"quest");
+	$$ = LLVMBuildSelect(Builder,comp,$1,$3,"select");
 }      
       | NUM
 { 
